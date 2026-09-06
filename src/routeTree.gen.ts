@@ -10,12 +10,33 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AlertsRouteImport } from './routes/alerts'
+import { Route as AnalyticsRouteImport } from './routes/analytics'
+import { Route as ChembuddyRouteImport } from './routes/chembuddy'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as DevicesRouteImport } from './routes/devices'
 import { Route as MapRouteImport } from './routes/map'
+import { Route as TestsIndexRouteImport } from './routes/tests.index'
+import { Route as TestsTestIdRouteImport } from './routes/tests.$testId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AlertsRoute = AlertsRouteImport.update({
+  id: '/alerts',
+  path: '/alerts',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AnalyticsRoute = AnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChembuddyRoute = ChembuddyRouteImport.update({
+  id: '/chembuddy',
+  path: '/chembuddy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -23,40 +44,107 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DevicesRoute = DevicesRouteImport.update({
+  id: '/devices',
+  path: '/devices',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MapRoute = MapRouteImport.update({
   id: '/map',
   path: '/map',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TestsIndexRoute = TestsIndexRouteImport.update({
+  id: '/tests/',
+  path: '/tests/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TestsTestIdRoute = TestsTestIdRouteImport.update({
+  id: '/tests/$testId',
+  path: '/tests/$testId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/alerts': typeof AlertsRoute
+  '/analytics': typeof AnalyticsRoute
+  '/chembuddy': typeof ChembuddyRoute
   '/dashboard': typeof DashboardRoute
+  '/devices': typeof DevicesRoute
   '/map': typeof MapRoute
+  '/tests/$testId': typeof TestsTestIdRoute
+  '/tests/': typeof TestsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/alerts': typeof AlertsRoute
+  '/analytics': typeof AnalyticsRoute
+  '/chembuddy': typeof ChembuddyRoute
   '/dashboard': typeof DashboardRoute
+  '/devices': typeof DevicesRoute
   '/map': typeof MapRoute
+  '/tests/$testId': typeof TestsTestIdRoute
+  '/tests': typeof TestsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/alerts': typeof AlertsRoute
+  '/analytics': typeof AnalyticsRoute
+  '/chembuddy': typeof ChembuddyRoute
   '/dashboard': typeof DashboardRoute
+  '/devices': typeof DevicesRoute
   '/map': typeof MapRoute
+  '/tests/$testId': typeof TestsTestIdRoute
+  '/tests/': typeof TestsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/map'
+  fullPaths:
+    | '/'
+    | '/alerts'
+    | '/analytics'
+    | '/chembuddy'
+    | '/dashboard'
+    | '/devices'
+    | '/map'
+    | '/tests/$testId'
+    | '/tests/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/map'
-  id: '__root__' | '/' | '/dashboard' | '/map'
+  to:
+    | '/'
+    | '/alerts'
+    | '/analytics'
+    | '/chembuddy'
+    | '/dashboard'
+    | '/devices'
+    | '/map'
+    | '/tests/$testId'
+    | '/tests'
+  id:
+    | '__root__'
+    | '/'
+    | '/alerts'
+    | '/analytics'
+    | '/chembuddy'
+    | '/dashboard'
+    | '/devices'
+    | '/map'
+    | '/tests/$testId'
+    | '/tests/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AlertsRoute: typeof AlertsRoute
+  AnalyticsRoute: typeof AnalyticsRoute
+  ChembuddyRoute: typeof ChembuddyRoute
   DashboardRoute: typeof DashboardRoute
+  DevicesRoute: typeof DevicesRoute
   MapRoute: typeof MapRoute
+  TestsTestIdRoute: typeof TestsTestIdRoute
+  TestsIndexRoute: typeof TestsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -68,11 +156,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/alerts': {
+      id: '/alerts'
+      path: '/alerts'
+      fullPath: '/alerts'
+      preLoaderRoute: typeof AlertsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/analytics': {
+      id: '/analytics'
+      path: '/analytics'
+      fullPath: '/analytics'
+      preLoaderRoute: typeof AnalyticsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/chembuddy': {
+      id: '/chembuddy'
+      path: '/chembuddy'
+      fullPath: '/chembuddy'
+      preLoaderRoute: typeof ChembuddyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/devices': {
+      id: '/devices'
+      path: '/devices'
+      fullPath: '/devices'
+      preLoaderRoute: typeof DevicesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/map': {
@@ -82,13 +198,33 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MapRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tests/': {
+      id: '/tests/'
+      path: '/tests'
+      fullPath: '/tests/'
+      preLoaderRoute: typeof TestsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tests/$testId': {
+      id: '/tests/$testId'
+      path: '/tests/$testId'
+      fullPath: '/tests/$testId'
+      preLoaderRoute: typeof TestsTestIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AlertsRoute: AlertsRoute,
+  AnalyticsRoute: AnalyticsRoute,
+  ChembuddyRoute: ChembuddyRoute,
   DashboardRoute: DashboardRoute,
+  DevicesRoute: DevicesRoute,
   MapRoute: MapRoute,
+  TestsTestIdRoute: TestsTestIdRoute,
+  TestsIndexRoute: TestsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
