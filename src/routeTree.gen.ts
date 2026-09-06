@@ -15,6 +15,7 @@ import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as DevicesRouteImport } from './routes/devices'
 import { Route as MapRouteImport } from './routes/map'
 import { Route as TestsIndexRouteImport } from './routes/tests.index'
+import { Route as TestsTestIdRouteImport } from './routes/tests.$testId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -46,6 +47,11 @@ const TestsIndexRoute = TestsIndexRouteImport.update({
   path: '/tests/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TestsTestIdRoute = TestsTestIdRouteImport.update({
+  id: '/tests/$testId',
+  path: '/tests/$testId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -53,6 +59,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/devices': typeof DevicesRoute
   '/map': typeof MapRoute
+  '/tests/$testId': typeof TestsTestIdRoute
   '/tests/': typeof TestsIndexRoute
 }
 export interface FileRoutesByTo {
@@ -61,6 +68,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/devices': typeof DevicesRoute
   '/map': typeof MapRoute
+  '/tests/$testId': typeof TestsTestIdRoute
   '/tests': typeof TestsIndexRoute
 }
 export interface FileRoutesById {
@@ -70,13 +78,28 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/devices': typeof DevicesRoute
   '/map': typeof MapRoute
+  '/tests/$testId': typeof TestsTestIdRoute
   '/tests/': typeof TestsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/chembuddy' | '/dashboard' | '/devices' | '/map' | '/tests/'
+  fullPaths:
+    | '/'
+    | '/chembuddy'
+    | '/dashboard'
+    | '/devices'
+    | '/map'
+    | '/tests/$testId'
+    | '/tests/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/chembuddy' | '/dashboard' | '/devices' | '/map' | '/tests'
+  to:
+    | '/'
+    | '/chembuddy'
+    | '/dashboard'
+    | '/devices'
+    | '/map'
+    | '/tests/$testId'
+    | '/tests'
   id:
     | '__root__'
     | '/'
@@ -84,6 +107,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/devices'
     | '/map'
+    | '/tests/$testId'
     | '/tests/'
   fileRoutesById: FileRoutesById
 }
@@ -93,6 +117,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   DevicesRoute: typeof DevicesRoute
   MapRoute: typeof MapRoute
+  TestsTestIdRoute: typeof TestsTestIdRoute
   TestsIndexRoute: typeof TestsIndexRoute
 }
 
@@ -140,6 +165,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TestsIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/tests/$testId': {
+      id: '/tests/$testId'
+      path: '/tests/$testId'
+      fullPath: '/tests/$testId'
+      preLoaderRoute: typeof TestsTestIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -149,6 +181,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   DevicesRoute: DevicesRoute,
   MapRoute: MapRoute,
+  TestsTestIdRoute: TestsTestIdRoute,
   TestsIndexRoute: TestsIndexRoute,
 }
 export const routeTree = rootRouteImport
