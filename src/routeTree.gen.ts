@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ChembuddyRouteImport } from './routes/chembuddy'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as DevicesRouteImport } from './routes/devices'
 import { Route as MapRouteImport } from './routes/map'
@@ -17,6 +18,11 @@ import { Route as MapRouteImport } from './routes/map'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ChembuddyRoute = ChembuddyRouteImport.update({
+  id: '/chembuddy',
+  path: '/chembuddy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -37,12 +43,14 @@ const MapRoute = MapRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/chembuddy': typeof ChembuddyRoute
   '/dashboard': typeof DashboardRoute
   '/devices': typeof DevicesRoute
   '/map': typeof MapRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/chembuddy': typeof ChembuddyRoute
   '/dashboard': typeof DashboardRoute
   '/devices': typeof DevicesRoute
   '/map': typeof MapRoute
@@ -50,20 +58,22 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/chembuddy': typeof ChembuddyRoute
   '/dashboard': typeof DashboardRoute
   '/devices': typeof DevicesRoute
   '/map': typeof MapRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/devices' | '/map'
+  fullPaths: '/' | '/chembuddy' | '/dashboard' | '/devices' | '/map'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/devices' | '/map'
-  id: '__root__' | '/' | '/dashboard' | '/devices' | '/map'
+  to: '/' | '/chembuddy' | '/dashboard' | '/devices' | '/map'
+  id: '__root__' | '/' | '/chembuddy' | '/dashboard' | '/devices' | '/map'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ChembuddyRoute: typeof ChembuddyRoute
   DashboardRoute: typeof DashboardRoute
   DevicesRoute: typeof DevicesRoute
   MapRoute: typeof MapRoute
@@ -76,6 +86,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/chembuddy': {
+      id: '/chembuddy'
+      path: '/chembuddy'
+      fullPath: '/chembuddy'
+      preLoaderRoute: typeof ChembuddyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -104,6 +121,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ChembuddyRoute: ChembuddyRoute,
   DashboardRoute: DashboardRoute,
   DevicesRoute: DevicesRoute,
   MapRoute: MapRoute,
