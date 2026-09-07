@@ -18,6 +18,7 @@ import { Route as DevicesRouteImport } from './routes/devices'
 import { Route as MapRouteImport } from './routes/map'
 import { Route as TestsIndexRouteImport } from './routes/tests.index'
 import { Route as TestsTestIdRouteImport } from './routes/tests.$testId'
+import { Route as ApiDeviceReadingsRouteImport } from './routes/api/device/readings'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -64,6 +65,11 @@ const TestsTestIdRoute = TestsTestIdRouteImport.update({
   path: '/tests/$testId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDeviceReadingsRoute = ApiDeviceReadingsRouteImport.update({
+  id: '/api/device/readings',
+  path: '/api/device/readings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -75,6 +81,7 @@ export interface FileRoutesByFullPath {
   '/map': typeof MapRoute
   '/tests/$testId': typeof TestsTestIdRoute
   '/tests/': typeof TestsIndexRoute
+  '/api/device/readings': typeof ApiDeviceReadingsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -86,6 +93,7 @@ export interface FileRoutesByTo {
   '/map': typeof MapRoute
   '/tests/$testId': typeof TestsTestIdRoute
   '/tests': typeof TestsIndexRoute
+  '/api/device/readings': typeof ApiDeviceReadingsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -98,6 +106,7 @@ export interface FileRoutesById {
   '/map': typeof MapRoute
   '/tests/$testId': typeof TestsTestIdRoute
   '/tests/': typeof TestsIndexRoute
+  '/api/device/readings': typeof ApiDeviceReadingsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -111,6 +120,7 @@ export interface FileRouteTypes {
     | '/map'
     | '/tests/$testId'
     | '/tests/'
+    | '/api/device/readings'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -122,6 +132,7 @@ export interface FileRouteTypes {
     | '/map'
     | '/tests/$testId'
     | '/tests'
+    | '/api/device/readings'
   id:
     | '__root__'
     | '/'
@@ -133,6 +144,7 @@ export interface FileRouteTypes {
     | '/map'
     | '/tests/$testId'
     | '/tests/'
+    | '/api/device/readings'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -145,6 +157,7 @@ export interface RootRouteChildren {
   MapRoute: typeof MapRoute
   TestsTestIdRoute: typeof TestsTestIdRoute
   TestsIndexRoute: typeof TestsIndexRoute
+  ApiDeviceReadingsRoute: typeof ApiDeviceReadingsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -212,6 +225,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TestsTestIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/device/readings': {
+      id: '/api/device/readings'
+      path: '/api/device/readings'
+      fullPath: '/api/device/readings'
+      preLoaderRoute: typeof ApiDeviceReadingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -225,6 +245,7 @@ const rootRouteChildren: RootRouteChildren = {
   MapRoute: MapRoute,
   TestsTestIdRoute: TestsTestIdRoute,
   TestsIndexRoute: TestsIndexRoute,
+  ApiDeviceReadingsRoute: ApiDeviceReadingsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
