@@ -16,9 +16,11 @@ import { Route as ChembuddyRouteImport } from './routes/chembuddy'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as DevicesRouteImport } from './routes/devices'
 import { Route as MapRouteImport } from './routes/map'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as TestsIndexRouteImport } from './routes/tests.index'
 import { Route as TestsTestIdRouteImport } from './routes/tests.$testId'
 import { Route as ApiDeviceReadingsRouteImport } from './routes/api/device/readings'
+import { Route as ApiIntelSummaryRouteImport } from './routes/api/intel/summary'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -55,6 +57,11 @@ const MapRoute = MapRouteImport.update({
   path: '/map',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const TestsIndexRoute = TestsIndexRouteImport.update({
   id: '/tests/',
   path: '/tests/',
@@ -70,6 +77,11 @@ const ApiDeviceReadingsRoute = ApiDeviceReadingsRouteImport.update({
   path: '/api/device/readings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiIntelSummaryRoute = ApiIntelSummaryRouteImport.update({
+  id: '/api/intel/summary',
+  path: '/api/intel/summary',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -79,9 +91,11 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/devices': typeof DevicesRoute
   '/map': typeof MapRoute
+  '/settings': typeof SettingsRoute
   '/tests/$testId': typeof TestsTestIdRoute
   '/tests/': typeof TestsIndexRoute
   '/api/device/readings': typeof ApiDeviceReadingsRoute
+  '/api/intel/summary': typeof ApiIntelSummaryRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -91,9 +105,11 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/devices': typeof DevicesRoute
   '/map': typeof MapRoute
+  '/settings': typeof SettingsRoute
   '/tests/$testId': typeof TestsTestIdRoute
   '/tests': typeof TestsIndexRoute
   '/api/device/readings': typeof ApiDeviceReadingsRoute
+  '/api/intel/summary': typeof ApiIntelSummaryRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -104,9 +120,11 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/devices': typeof DevicesRoute
   '/map': typeof MapRoute
+  '/settings': typeof SettingsRoute
   '/tests/$testId': typeof TestsTestIdRoute
   '/tests/': typeof TestsIndexRoute
   '/api/device/readings': typeof ApiDeviceReadingsRoute
+  '/api/intel/summary': typeof ApiIntelSummaryRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -118,9 +136,11 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/devices'
     | '/map'
+    | '/settings'
     | '/tests/$testId'
     | '/tests/'
     | '/api/device/readings'
+    | '/api/intel/summary'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -130,9 +150,11 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/devices'
     | '/map'
+    | '/settings'
     | '/tests/$testId'
     | '/tests'
     | '/api/device/readings'
+    | '/api/intel/summary'
   id:
     | '__root__'
     | '/'
@@ -142,9 +164,11 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/devices'
     | '/map'
+    | '/settings'
     | '/tests/$testId'
     | '/tests/'
     | '/api/device/readings'
+    | '/api/intel/summary'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -155,9 +179,11 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   DevicesRoute: typeof DevicesRoute
   MapRoute: typeof MapRoute
+  SettingsRoute: typeof SettingsRoute
   TestsTestIdRoute: typeof TestsTestIdRoute
   TestsIndexRoute: typeof TestsIndexRoute
   ApiDeviceReadingsRoute: typeof ApiDeviceReadingsRoute
+  ApiIntelSummaryRoute: typeof ApiIntelSummaryRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -211,6 +237,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MapRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/tests/': {
       id: '/tests/'
       path: '/tests'
@@ -232,6 +265,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiDeviceReadingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/intel/summary': {
+      id: '/api/intel/summary'
+      path: '/api/intel/summary'
+      fullPath: '/api/intel/summary'
+      preLoaderRoute: typeof ApiIntelSummaryRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -243,9 +283,11 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   DevicesRoute: DevicesRoute,
   MapRoute: MapRoute,
+  SettingsRoute: SettingsRoute,
   TestsTestIdRoute: TestsTestIdRoute,
   TestsIndexRoute: TestsIndexRoute,
   ApiDeviceReadingsRoute: ApiDeviceReadingsRoute,
+  ApiIntelSummaryRoute: ApiIntelSummaryRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
