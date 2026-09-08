@@ -1,6 +1,7 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
 import { AppShell } from "@/components/sentinel/AppShell";
+import { useEffect, useMemo, useState } from "react";
+import { supabase } from "../lib/supabaseClient";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { IntelMap } from "@/components/sentinel/IntelMap";
 import { ConfidenceBar, EmptyState, Panel, RiskBadge, StatusBadge } from "@/components/sentinel/primitives";
 import { CATEGORY_LABEL, formatDateTime, relativeTime } from "@/lib/sentinel/format";
@@ -67,6 +68,44 @@ function Chip({
 }
 
 function MapPage() {
+  const [latestScan, setLatestScan] = useState<any>(null);
+
+useEffect(() => {
+  const loadLatestScan = async () => {
+    const { data, error } = await supabase
+      .from("scans")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (!error && data) {
+      setLatestScan(data);
+    }
+  };
+
+  loadLatestScan();
+
+  const channel = supabase
+    .channel("map-scans")
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "scans",
+      },
+      (payload) => {
+        console.log("Map new scan:", payload.new);
+        setLatestScan(payload.new);
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, []);
   const all = getEvents();
   const locations = getLocations();
   const hotspots = getHotspots();
@@ -122,6 +161,21 @@ function MapPage() {
     >
       <div className="grid gap-4 xl:grid-cols-3">
         <Panel className="xl:col-span-2" bodyClassName="p-3">
+          {latestScan && (
+  <div className="mb-3 rounded-md border border-primary/40 bg-primary/5 p-3">
+    <p className="label-caps">LIVE DETECTOR READING</p>
+    <div className="mt-2 grid grid-cols-2 gap-3">
+      <div>
+        <p className="text-xs text-muted-foreground">Spectral</p>
+        <p className="font-mono text-sm">{latestScan.spectral_reading}</p>
+      </div>
+      <div>
+        <p className="text-xs text-muted-foreground">Gas</p>
+        <p className="font-mono text-sm">{latestScan.gas_reading}</p>
+      </div>
+    </div>
+  </div>
+)}
           <IntelMap
             events={events}
             locations={locations}

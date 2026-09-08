@@ -23,7 +23,7 @@ export function formatDateTime(isoString: string) {
   });
 }
 
-export const CATEGORY_LABEL: Record<SubstanceCategory, string> = {
+ export const CATEGORY_LABEL: Record<SubstanceCategory, string> = {
   opioid: "Opioid",
   stimulant: "Stimulant",
   cannabinoid: "Cannabinoid",

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { BatteryCharging, Cpu, RadioTower, Waves } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AppShell } from "@/components/sentinel/AppShell";
 import { Panel } from "@/components/sentinel/primitives";
 import { SpectralChart } from "@/components/sentinel/SpectralChart";
@@ -8,6 +8,7 @@ import { formatDateTime, relativeTime } from "@/lib/sentinel/format";
 import { getDevices, getLocation, getReadingForTest, getTests } from "@/lib/sentinel/service";
 import type { DeviceStatus, SensorHealth } from "@/lib/sentinel/types";
 import { cn } from "@/lib/utils";
+import { supabase } from "../lib/supabaseClient";
 
 export const Route = createFileRoute("/devices")({
   head: () => ({
@@ -42,6 +43,46 @@ const healthClass: Record<SensorHealth, string> = {
 };
 
 function DevicesPage() {
+  const [latestScan, setLatestScan] = useState<any>(null);
+  useEffect(() => {
+  const loadLatestScan = async () => {
+    const { data, error } = await supabase
+      .from("scans")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (!error && data) {
+      setLatestScan(data);
+    }
+  };
+
+  loadLatestScan();
+}, []);
+useEffect(() => {
+  const channel = supabase
+    .channel("devices-scans-realtime")
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "scans",
+      },
+      (payload) => {
+        console.log("New device scan:", payload.new);
+        setLatestScan(payload.new);
+      }
+    )
+    .subscribe((status) => {
+      console.log("Devices realtime:", status);
+    });
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, []);
   const devices = getDevices();
   const tests = getTests();
   const [activeId, setActiveId] = useState(devices[0]?.id ?? "SG-D01");
@@ -126,7 +167,13 @@ function DevicesPage() {
                   <span className={cn("font-mono text-xs uppercase", healthClass[s.health])}>{s.health}</span>
                 </div>
                 <p className="mt-3 rounded-md border border-border bg-background/50 p-3 font-mono text-sm">
-                  {s.current_reading}
+                  {s.type === "spectral"
+  ? latestScan?.spectral_reading
+    ? `Live reading: ${latestScan.spectral_reading}`
+    : s.current_reading
+  : latestScan?.gas_reading
+    ? `Live reading: ${latestScan.gas_reading}`
+    : s.current_reading}
                 </p>
                 <p className="mt-2 label-caps">calibrated {relativeTime(s.calibrated_at)}</p>
               </Panel>

@@ -78,7 +78,7 @@ export const devices: Device[] = [
         name: "AS7341 11-Channel Spectral",
         type: "spectral",
         health: "nominal",
-        current_reading: "415–680 nm · peak 0.82 rel @ 555 nm",
+       current_reading: "415-680 nm, peak 0.82 @ 555 nm",
         calibrated_at: iso(36),
       },
       {

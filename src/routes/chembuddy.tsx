@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "../lib/supabaseClient";
 import { AppShell } from "@/components/sentinel/AppShell";
 import { ChemBuddyDetail } from "@/components/sentinel/ChemBuddyReport";
 import { EmptyState, Panel, StatusBadge } from "@/components/sentinel/primitives";
@@ -32,12 +33,68 @@ export const Route = createFileRoute("/chembuddy")({
 });
 
 function ChemBuddyPage() {
+  const [latestScan, setLatestScan] = useState<any>(null);
+  useEffect(() => {
+  const loadLatestScan = async () => {
+    const { data, error } = await supabase
+      .from("scans")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (!error && data) {
+      setLatestScan(data);
+    }
+  };
+
+  loadLatestScan();
+
+}, []);
+useEffect(() => {
+  const channel = supabase
+    .channel("chembuddy-scans-realtime")
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "scans",
+      },
+      (payload) => {
+        console.log("ChemBuddy new scan:", payload.new);
+        setLatestScan(payload.new);
+      }
+    )
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, []);
   const tests = getTests();
   const metrics = getCommandMetrics();
   const [testId, setTestId] = useState(tests[0]!.id);
   const test = tests.find((t) => t.id === testId)!;
   const analysis = getAnalysisForTest(testId);
-  const reading = getReadingForTest(testId);
+const reading = getReadingForTest(testId);
+
+const liveSpectral = latestScan?.spectral_reading;
+const liveGas = latestScan?.gas_reading;
+
+const liveConfidence =
+  liveSpectral !== undefined
+    ? Math.max(0, 100 - Math.abs(liveSpectral - 2500) / 50)
+    : null;
+
+const liveVerdict =
+  liveConfidence !== null
+    ? liveConfidence > 85 && liveGas > 1000
+      ? "CONFIDENT MATCH: Target Detected"
+      : liveConfidence > 50
+        ? "INCONCLUSIVE: Send to Lab"
+        : "NEGATIVE: No Match"
+    : null;
 
   return (
     <AppShell
@@ -70,11 +127,70 @@ function ChemBuddyPage() {
           </ul>
         </Panel>
 
-        {analysis && reading ? (
-          <ChemBuddyDetail analysis={analysis} reading={reading} test={test} />
-        ) : (
-          <EmptyState message="No analysis available for this screening." />
-        )}
+       {latestScan ? (
+  <div className="space-y-4">
+    <ChemBuddyDetail
+  analysis={{
+    ...analysis,
+    category: analysis.category,
+   confidence: liveConfidence !== null
+  ? liveConfidence / 100
+  : analysis.confidence,
+    classification:
+  liveVerdict === "CONFIDENT MATCH: Target Detected"
+    ? "Target Detected"
+    : liveVerdict === "INCONCLUSIVE: Send to Lab"
+      ? "INCONCLUSIVE"
+      : "No Controlled Substance Detected",
+  }}
+  reading={{
+  ...reading,
+  spectral_reading: latestScan.spectral_reading,
+  gas_reading: latestScan.gas_reading,
+  gas_ppm: latestScan.gas_reading,
+}}
+  test={test}
+/>
+
+    <Panel title="Live ChemBuddy Result" hint="Based on latest detector reading">
+      <div className="space-y-3">
+        <div>
+          <p className="text-xs text-muted-foreground">VERDICT</p>
+          <p className="mt-1 text-lg font-semibold">
+            {liveVerdict ?? "Waiting for sensor data"}
+          </p>
+        </div>
+
+        <div>
+          <p className="text-xs text-muted-foreground">CONFIDENCE</p>
+          <p className="mt-1 text-lg font-semibold">
+            {liveConfidence !== null
+              ? `${liveConfidence.toFixed(1)}%`
+              : "—"}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <p className="text-xs text-muted-foreground">SPECTRAL</p>
+            <p className="font-mono">
+              {latestScan.spectral_reading}
+            </p>
+          </div>
+
+          <div>
+            <p className="text-xs text-muted-foreground">GAS</p>
+            <p className="font-mono">
+              {latestScan.gas_reading}
+            </p>
+          </div>
+        </div>
+      </div>
+    </Panel>
+  </div>
+) : (
+  <EmptyState message="Waiting for live detector data..." />
+)}
       </div>
     </AppShell>
   );
