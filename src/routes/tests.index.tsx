@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+
 import { AppShell } from "@/components/sentinel/AppShell";
 import {
   ConfidenceBar,
@@ -8,122 +9,228 @@ import {
   StatusBadge,
 } from "@/components/sentinel/primitives";
 import { CATEGORY_LABEL, formatDateTime } from "@/lib/sentinel/format";
-import { getLocation, getTests } from "@/lib/sentinel/service";
+import { getTests } from "@/lib/sentinel/service";
 import type { TestStatus } from "@/lib/sentinel/types";
+
 import { supabase } from "../lib/supabaseClient";
+import { loadCSVReports } from "../lib/csvReports";
 
 export const Route = createFileRoute("/tests/")({
-  head: () => ({
-    meta: [
-      { title: "Tests & Evidence — SentinelGrid" },
-      {
-        name: "description",
-        content:
-          "Searchable register of field screenings with classification, confidence, device, zone and links to full evidence records.",
-      },
-      { property: "og:title", content: "Tests & Evidence — SentinelGrid" },
-      {
-        property: "og:description",
-        content: "Every field screening and its evidence record.",
-      },
-    ],
-  }),
   component: TestsPage,
 });
-
-const FILTERS: (TestStatus | "all")[] = [
-  "all",
-  "positive",
-  "inconclusive",
-  "negative",
-];
 
 function TestsPage() {
   const baseTests = getTests();
 
   const [status, setStatus] = useState<TestStatus | "all">("all");
   const [query, setQuery] = useState("");
+
   const [latestScan, setLatestScan] = useState<any>(null);
   const [liveScanCount, setLiveScanCount] = useState(0);
   const [liveTests, setLiveTests] = useState<any[]>([]);
+  const [csvTests, setCsvTests] = useState<any[]>([]);
 
+  /* ---------------------------------------------------------
+     LOAD CSV REFERENCE REPORTS
+  --------------------------------------------------------- */
   useEffect(() => {
-    const loadLatestScan = async () => {
-      const { data, error } = await supabase
-        .from("scans")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
+    loadCSVReports().then((reports) => {
+      console.log("CSV reports loaded:", reports);
 
-      if (!error && data) {
-        setLatestScan(data);
-      }
-    };
+      const convertedCSVTests = reports.map((report, index) => {
+        const rawConfidence = Number(report.confidence) || 0;
 
-    const loadScans = async () => {
-      const { data, error } = await supabase
-        .from("scans")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error || !data) {
-        console.error("Failed to load scans:", error);
-        return;
-      }
-
-      setLiveScanCount(data.length);
-
-      const convertedTests = data.map((scan: any) => {
-        const spectral = Number(scan.spectral_reading ?? 0);
-        const gas = Number(scan.gas_reading ?? 0);
+        // Support both:
+        // 0.95  -> 95%
+        // 95    -> 95%
+        const confidencePercent =
+          rawConfidence <= 1
+            ? rawConfidence * 100
+            : rawConfidence;
 
         const confidence = Math.max(
           0,
-          Math.min(100, 100 - Math.abs(spectral - 2500) / 50),
+          Math.min(100, confidencePercent),
         );
 
-        let testStatus: TestStatus;
-        let substanceLabel: string;
+        const statusText = String(
+          report.status ?? "",
+        ).toLowerCase();
 
-        if (confidence > 85 && gas > 1000) {
-          testStatus = "positive";
-          substanceLabel = "Prototype Target Signature";
-        } else if (confidence > 50) {
-          testStatus = "inconclusive";
-          substanceLabel = "Inconclusive Signal";
-        } else {
-          testStatus = "negative";
-          substanceLabel = "No Reference Match";
-        }
+        const statusValue =
+          statusText.includes("positive") ||
+          statusText.includes("detected") ||
+          statusText.includes("match")
+            ? "positive"
+            : statusText.includes("inconclusive") ||
+                statusText.includes("uncertain")
+              ? "inconclusive"
+              : "negative";
 
         return {
-          id: `SCAN-${String(scan.id).slice(0, 8).toUpperCase()}`,
-          test_id: scan.id,
-          substance_label: substanceLabel,
-          category: "unknown",
-          device_id: "FIELD-DETECTOR-01",
-          location_id: "live",
+          id: `CSV-${String(index + 1).padStart(3, "0")}`,
+
+          test_id: `CSV-${String(index + 1).padStart(3, "0")}`,
+
+          substance_label:
+            report.substance_label ||
+            "Reference Record",
+
+          category:
+            report.category ||
+            "unknown",
+
+          device_id:
+            report.device_id ||
+            "CSV-REFERENCE",
+
+          location_id:
+            report.location_id ||
+            "reference",
+
+          // Store confidence as 0–1 because
+          // ConfidenceBar expects that format.
           confidence: confidence / 100,
+
           risk_level:
-            confidence > 85 && gas > 1000
-              ? "high"
-              : confidence > 50
-                ? "medium"
-                : "low",
-          status: testStatus,
-          created_at: scan.created_at ?? scan.timestamp,
+            report.risk_level ||
+            "low",
+
+          status:
+            statusValue as TestStatus,
+
+          created_at:
+            report.captured_at,
+
+          source: "CSV",
         };
       });
+
+      console.log(
+        "Converted CSV tests:",
+        convertedCSVTests,
+      );
+
+      setCsvTests(convertedCSVTests);
+    });
+  }, []);
+
+  /* ---------------------------------------------------------
+     LOAD SUPABASE SCANS
+  --------------------------------------------------------- */
+  useEffect(() => {
+    const loadScans = async () => {
+      const { data, error, count } = await supabase
+        .from("scans")
+        .select("*", { count: "exact" })
+        .order("created_at", {
+          ascending: false,
+        });
+
+      if (error) {
+        console.error(
+          "Failed to load scans:",
+          error,
+        );
+        return;
+      }
+
+      const scans = data ?? [];
+
+      setLiveScanCount(
+        count ?? scans.length,
+      );
+
+      if (scans.length > 0) {
+        setLatestScan(scans[0]);
+      }
+
+      const convertedTests = scans.map(
+        (scan: any) => {
+          const spectral = Number(
+            scan["spectral_reading"] ?? 0,
+          );
+
+          const gas = Number(
+            scan["gas_reading"] ?? 0,
+          );
+
+          const confidence = Math.max(
+            0,
+            Math.min(
+              100,
+              100 -
+                Math.abs(
+                  spectral - 2500,
+                ) /
+                  50,
+            ),
+          );
+
+          const isMatch =
+            confidence > 85 &&
+            gas > 1000;
+
+          const isInconclusive =
+            confidence > 50 &&
+            !isMatch;
+
+          const testStatus: TestStatus =
+            isMatch
+              ? "positive"
+              : isInconclusive
+                ? "inconclusive"
+                : "negative";
+
+          return {
+            id: scan["id"],
+            test_id: scan["id"],
+
+            substance_label: isMatch
+              ? "Prototype Target Signature"
+              : isInconclusive
+                ? "Inconclusive Signal"
+                : "No Reference Match",
+
+            category:
+              "unknown",
+
+            device_id:
+              "FIELD-DETECTOR-01",
+
+            location_id:
+              "field",
+
+            confidence:
+              confidence / 100,
+
+            risk_level:
+              isMatch
+                ? "high"
+                : "low",
+
+            status:
+              testStatus,
+
+            created_at:
+              scan["created_at"] ??
+              scan["timestamp"],
+
+            source: "SUPABASE",
+          };
+        },
+      );
 
       setLiveTests(convertedTests);
     };
 
-    loadLatestScan();
     loadScans();
 
+    /* -------------------------------------------------------
+       REALTIME SUPABASE SCANS
+    ------------------------------------------------------- */
     const channel = supabase
-      .channel("tests-live-scans")
+      .channel("tests-page-scans")
       .on(
         "postgres_changes",
         {
@@ -132,370 +239,605 @@ function TestsPage() {
           table: "scans",
         },
         (payload) => {
-          const scan: any = payload.new;
+          const newScan: any =
+            payload.new;
 
-          setLatestScan(scan);
-          setLiveScanCount((count) => count + 1);
+          const spectral = Number(
+            newScan?.["spectral_reading"] ??
+              0,
+          );
 
-          const spectral = Number(scan.spectral_reading ?? 0);
-          const gas = Number(scan.gas_reading ?? 0);
+          const gas = Number(
+            newScan?.["gas_reading"] ??
+              0,
+          );
 
           const confidence = Math.max(
             0,
-            Math.min(100, 100 - Math.abs(spectral - 2500) / 50),
+            Math.min(
+              100,
+              100 -
+                Math.abs(
+                  spectral - 2500,
+                ) /
+                  50,
+            ),
           );
 
-          let testStatus: TestStatus;
-          let substanceLabel: string;
+          const isMatch =
+            confidence > 85 &&
+            gas > 1000;
 
-          if (confidence > 85 && gas > 1000) {
-            testStatus = "positive";
-            substanceLabel = "Prototype Target Signature";
-          } else if (confidence > 50) {
-            testStatus = "inconclusive";
-            substanceLabel = "Inconclusive Signal";
-          } else {
-            testStatus = "negative";
-            substanceLabel = "No Reference Match";
-          }
+          const isInconclusive =
+            confidence > 50 &&
+            !isMatch;
+
+          const testStatus: TestStatus =
+            isMatch
+              ? "positive"
+              : isInconclusive
+                ? "inconclusive"
+                : "negative";
 
           const newTest = {
-            id: `SCAN-${String(scan.id).slice(0, 8).toUpperCase()}`,
-            test_id: scan.id,
-            substance_label: substanceLabel,
-            category: "unknown",
-            device_id: "FIELD-DETECTOR-01",
-            location_id: "live",
-            confidence: confidence / 100,
+            id:
+              newScan?.["id"],
+
+            test_id:
+              newScan?.["id"],
+
+            substance_label:
+              isMatch
+                ? "Prototype Target Signature"
+                : isInconclusive
+                  ? "Inconclusive Signal"
+                  : "No Reference Match",
+
+            category:
+              "unknown",
+
+            device_id:
+              "FIELD-DETECTOR-01",
+
+            location_id:
+              "field",
+
+            confidence:
+              confidence / 100,
+
             risk_level:
-              confidence > 85 && gas > 1000
+              isMatch
                 ? "high"
-                : confidence > 50
-                  ? "medium"
-                  : "low",
-            status: testStatus,
-            created_at: scan.created_at ?? scan.timestamp,
+                : "low",
+
+            status:
+              testStatus,
+
+            created_at:
+              newScan?.["created_at"] ??
+              newScan?.["timestamp"],
+
+            source:
+              "SUPABASE",
           };
 
-          setLiveTests((current) => [newTest, ...current]);
+          setLatestScan(
+            newScan,
+          );
+
+          setLiveTests(
+            (current) => [
+              newTest,
+              ...current,
+            ],
+          );
+
+          setLiveScanCount(
+            (current) =>
+              current + 1,
+          );
         },
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(
+        channel,
+      );
     };
   }, []);
 
-  const tests = useMemo(() => {
-    const combined = [...liveTests, ...baseTests];
+  /* ---------------------------------------------------------
+     COMBINE ALL TEST SOURCES
+  --------------------------------------------------------- */
+  const combined = useMemo(() => {
+    return [
+      ...liveTests,
+      ...csvTests,
+      ...baseTests,
+    ];
+  }, [
+    baseTests,
+    liveTests,
+    csvTests,
+  ]);
 
-    return combined.filter((t) => {
-      const matchesStatus =
-        status === "all" || t.status === status;
+  /* ---------------------------------------------------------
+     FILTER TESTS
+  --------------------------------------------------------- */
+  const filteredTests =
+    useMemo(() => {
+      const normalizedQuery =
+        query
+          .trim()
+          .toLowerCase();
 
-      const searchText = query.trim().toLowerCase();
+      return combined.filter(
+        (test: any) => {
+          const matchesStatus =
+            status === "all" ||
+            test.status ===
+              status;
 
-      const matchesQuery =
-        !searchText ||
-        String(t.id ?? "")
-          .toLowerCase()
-          .includes(searchText) ||
-        String(t.test_id ?? "")
-          .toLowerCase()
-          .includes(searchText) ||
-        String(t.substance_label ?? "")
-          .toLowerCase()
-          .includes(searchText) ||
-        String(t.device_id ?? "")
-          .toLowerCase()
-          .includes(searchText);
+          const searchableText =
+            [
+              test.id,
+              test.test_id,
+              test.substance_label,
+              test.category,
+              test.device_id,
+              test.location_id,
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .toLowerCase();
 
-      return matchesStatus && matchesQuery;
-    });
-  }, [baseTests, liveTests, query, status]);
+          const matchesQuery =
+            !normalizedQuery ||
+            searchableText.includes(
+              normalizedQuery,
+            );
 
-  const positiveCount = liveTests.filter(
-    (t) => t.status === "positive",
-  ).length;
+          return (
+            matchesStatus &&
+            matchesQuery
+          );
+        },
+      );
+    }, [
+      combined,
+      query,
+      status,
+    ]);
 
-  const inconclusiveCount = liveTests.filter(
-    (t) => t.status === "inconclusive",
-  ).length;
+  /* ---------------------------------------------------------
+     LIVE SUMMARY
+  --------------------------------------------------------- */
+  const positiveCount =
+    liveTests.filter(
+      (test) =>
+        test.status ===
+        "positive",
+    ).length;
+
+  const inconclusiveCount =
+    liveTests.filter(
+      (test) =>
+        test.status ===
+        "inconclusive",
+    ).length;
 
   const liveSpectral =
-    latestScan?.spectral_reading !== undefined
-      ? Number(latestScan.spectral_reading)
-      : null;
+    latestScan?.[
+      "spectral_reading"
+    ];
 
   const liveGas =
-    latestScan?.gas_reading !== undefined
-      ? Number(latestScan.gas_reading)
-      : null;
+    latestScan?.[
+      "gas_reading"
+    ];
 
   const liveConfidence =
-    liveSpectral !== null
+    liveSpectral !==
+    undefined
       ? Math.max(
           0,
           Math.min(
             100,
-            100 - Math.abs(liveSpectral - 2500) / 50,
+            100 -
+              Math.abs(
+                Number(
+                  liveSpectral,
+                ) - 2500,
+              ) /
+                50,
           ),
         )
       : null;
 
   return (
     <AppShell
-      title="Tests & Evidence"
-      subtitle="Field screening register and evidence records"
-    >
+  title="Tests & Evidence"
+  subtitle="Live detector scans and CSV reference reports"
+>
       <div className="space-y-6">
-        {/* LIVE DETECTOR SIGNAL */}
-        <Panel
-          title="LIVE DETECTOR SIGNAL"
-          hint="Realtime readings from Supabase"
-          bodyClassName="p-4"
-        >
-          {latestScan ? (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-              <div>
-                <p className="label-caps">SPECTRAL</p>
-                <p className="mt-1 font-mono text-2xl font-semibold">
-                  {liveSpectral}
-                </p>
-              </div>
+        {/* ---------------------------------------------------
+            HEADER
+        --------------------------------------------------- */}
+        <div>
+          <p className="label-caps">
+            Field screening register
+            and evidence records
+          </p>
 
-              <div>
-                <p className="label-caps">GAS</p>
-                <p className="mt-1 font-mono text-2xl font-semibold">
-                  {liveGas}
-                </p>
-              </div>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+            Tests & Evidence
+          </h1>
 
-              <div>
-                <p className="label-caps">PROTOTYPE CONFIDENCE</p>
-                <p className="mt-1 font-mono text-2xl font-semibold">
-                  {liveConfidence !== null
-                    ? `${liveConfidence.toFixed(0)}%`
-                    : "—"}
-                </p>
-              </div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Live detector scans and
+            CSV reference reports
+          </p>
+        </div>
 
-              <div>
-                <p className="label-caps">SUPABASE SCANS</p>
-                <p className="mt-1 font-mono text-2xl font-semibold">
-                  {liveScanCount}
-                </p>
-              </div>
+        {/* ---------------------------------------------------
+            LIVE DETECTOR
+        --------------------------------------------------- */}
+        <Panel>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="label-caps">
+                Live detector signal
+              </p>
+
+              <p className="mt-1 text-sm text-muted-foreground">
+                Realtime readings from
+                Supabase
+              </p>
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Waiting for detector data...
-            </p>
-          )}
 
-          <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-            <div className="rounded-md border border-border/60 bg-muted/20 p-3">
-              <p className="label-caps">POSITIVE</p>
-              <p className="mt-1 font-mono text-lg">
+            <div className="text-xs text-muted-foreground">
+              LIVE
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 md:grid-cols-4">
+            <div>
+              <p className="label-caps">
+                Spectral
+              </p>
+
+              <p className="mt-2 font-mono text-2xl font-semibold">
+                {liveSpectral ??
+                  "—"}
+              </p>
+            </div>
+
+            <div>
+              <p className="label-caps">
+                Gas
+              </p>
+
+              <p className="mt-2 font-mono text-2xl font-semibold">
+                {liveGas ??
+                  "—"}
+              </p>
+            </div>
+
+            <div>
+              <p className="label-caps">
+                Prototype confidence
+              </p>
+
+              <p className="mt-2 font-mono text-2xl font-semibold">
+                {liveConfidence !==
+                null
+                  ? `${Math.round(
+                      liveConfidence,
+                    )}%`
+                  : "—"}
+              </p>
+            </div>
+
+            <div>
+              <p className="label-caps">
+                Supabase scans
+              </p>
+
+              <p className="mt-2 font-mono text-2xl font-semibold">
+                {liveScanCount}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 grid gap-4 md:grid-cols-3">
+            <div>
+              <p className="label-caps">
+                Positive
+              </p>
+
+              <p className="mt-1 text-lg font-semibold">
                 {positiveCount}
               </p>
+
               <p className="text-xs text-muted-foreground">
-                Live prototype classification
+                Live prototype
+                classification
               </p>
             </div>
 
-            <div className="rounded-md border border-border/60 bg-muted/20 p-3">
-              <p className="label-caps">INCONCLUSIVE</p>
-              <p className="mt-1 font-mono text-lg">
+            <div>
+              <p className="label-caps">
+                Inconclusive
+              </p>
+
+              <p className="mt-1 text-lg font-semibold">
                 {inconclusiveCount}
               </p>
+
               <p className="text-xs text-muted-foreground">
-                Requires laboratory confirmation
+                Requires laboratory
+                confirmation
               </p>
             </div>
 
-            <div className="rounded-md border border-border/60 bg-muted/20 p-3">
-              <p className="label-caps">DEVICE</p>
-              <p className="mt-1 font-mono text-lg">
-                FIELD-DETECTOR-01
+            <div>
+              <p className="label-caps">
+                CSV reports
               </p>
+
+              <p className="mt-1 text-lg font-semibold">
+                {csvTests.length}
+              </p>
+
               <p className="text-xs text-muted-foreground">
-                Realtime connection active
+                Reference dataset
+                records
               </p>
             </div>
           </div>
         </Panel>
 
-        {/* FILTERS */}
-        <Panel
-          title="SCREENING REGISTER"
-          hint={`${tests.length} records`}
-          bodyClassName="p-4"
-        >
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="flex flex-wrap gap-2">
-              {FILTERS.map((filter) => (
-                <button
-                  key={filter}
-                  type="button"
-                  onClick={() => setStatus(filter)}
-                  className={`rounded-md border px-3 py-1.5 text-xs font-medium capitalize transition ${
-                    status === filter
-                      ? "border-primary bg-primary/10 text-primary"
-                      : "border-border text-muted-foreground hover:bg-muted"
-                  }`}
-                >
-                  {filter}
-                </button>
-              ))}
+        {/* ---------------------------------------------------
+            FILTERS
+        --------------------------------------------------- */}
+        <Panel>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="label-caps">
+                Screening register
+              </p>
+
+              <p className="mt-1 text-sm text-muted-foreground">
+                {filteredTests.length}{" "}
+                records
+              </p>
             </div>
 
             <input
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search tests, devices..."
-              className="h-9 w-full rounded-md border border-border bg-background px-3 text-sm outline-none focus:border-primary md:w-72"
+              onChange={(event) =>
+                setQuery(
+                  event.target.value,
+                )
+              }
+              placeholder="Search tests..."
+              className="h-10 rounded-md border bg-background px-3 text-sm outline-none"
             />
+          </div>
+
+          <div className="mt-4 flex flex-wrap gap-2">
+            {(
+              [
+                "all",
+                "positive",
+                "inconclusive",
+                "negative",
+              ] as const
+            ).map((item) => (
+              <button
+                key={item}
+                onClick={() =>
+                  setStatus(
+                    item,
+                  )
+                }
+                className={`rounded-md border px-3 py-1.5 text-xs font-medium ${
+                  status === item
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-background"
+                }`}
+              >
+                {item ===
+                "all"
+                  ? "All"
+                  : item
+                      .charAt(
+                        0,
+                      )
+                      .toUpperCase() +
+                    item.slice(
+                      1,
+                    )}
+              </button>
+            ))}
           </div>
         </Panel>
 
-        {/* TEST TABLE */}
-        <Panel
-          title="TESTS & EVIDENCE"
-          hint="Each live scan is linked to its Supabase record"
-          bodyClassName="p-0"
-        >
+        {/* ---------------------------------------------------
+            TEST TABLE
+        --------------------------------------------------- */}
+        <Panel>
+          <div className="mb-4">
+            <p className="label-caps">
+              Tests & Evidence
+            </p>
+
+            <p className="mt-1 text-sm text-muted-foreground">
+              Live detector scans
+              and CSV reference
+              reports
+            </p>
+          </div>
+
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left">
+            <table className="w-full text-left text-sm">
               <thead>
-                <tr className="border-b border-border bg-muted/20">
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <tr className="border-b text-xs uppercase tracking-wider text-muted-foreground">
+                  <th className="px-3 py-3">
                     Test ID
                   </th>
 
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <th className="px-3 py-3">
                     Classification
                   </th>
 
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <th className="px-3 py-3">
                     Category
                   </th>
 
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <th className="px-3 py-3">
                     Device
                   </th>
 
-                  <th className="w-40 px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <th className="px-3 py-3">
                     Confidence
                   </th>
 
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <th className="px-3 py-3">
                     Status
                   </th>
 
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <th className="px-3 py-3">
                     Risk
                   </th>
 
-                  <th className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <th className="px-3 py-3">
                     Time
                   </th>
                 </tr>
               </thead>
 
               <tbody>
-                {tests.length === 0 ? (
-                  <tr>
-                    <td
-                      colSpan={8}
-                      className="px-4 py-10 text-center text-sm text-muted-foreground"
-                    >
-                      No matching test records found.
-                    </td>
-                  </tr>
-                ) : (
-                  tests.map((t: any) => (
-                    <tr
-                      key={`${t.test_id ?? t.id}-${t.created_at}`}
-                      className="border-b border-border/60 transition hover:bg-muted/20"
-                    >
-                      <td className="px-4 py-2.5">
-                        <Link
-                          to="/tests/$testId"
-                          params={{
-                            testId: t.test_id ?? t.id,
-                          }}
-                          className="font-mono text-xs font-medium text-primary hover:underline"
-                        >
-                          {t.id}
-                        </Link>
-                      </td>
+                {filteredTests.map(
+                  (test: any) => {
+                    const testId =
+                      test.test_id ??
+                      test.id;
 
-                      <td className="px-4 py-2.5">
-                        <span className="text-sm font-medium">
-                          {t.substance_label ?? "Unclassified"}
-                        </span>
-                      </td>
+                    return (
+                      <tr
+                        key={`${test.source ?? "base"}-${testId}`}
+                        className="border-b last:border-0"
+                      >
+                        <td className="px-3 py-3">
+                          <Link
+                            to="/tests/$testId"
+                            params={{
+                              testId:
+                                String(
+                                  testId,
+                                ),
+                            }}
+                            className="font-mono text-xs font-semibold hover:underline"
+                          >
+                            {test.source ===
+                            "CSV"
+                              ? testId
+                              : `SCAN-${String(
+                                  testId,
+                                )
+                                  .slice(
+                                    0,
+                                    8,
+                                  )
+                                  .toUpperCase()}`}
+                          </Link>
+                        </td>
 
-                      <td className="px-4 py-2.5">
-                        <span className="text-sm text-muted-foreground">
+                        <td className="px-3 py-3 font-medium">
+                          {test.substance_label ??
+                            "Reference Record"}
+                        </td>
+
+                        <td className="px-3 py-3">
                           {CATEGORY_LABEL[
-                            t.category as keyof typeof CATEGORY_LABEL
-                          ] ?? "Unclassified"}
-                        </span>
-                      </td>
+                            test.category as keyof typeof CATEGORY_LABEL
+                          ] ??
+                            test.category ??
+                            "Unclassified"}
+                        </td>
 
-                      <td className="px-4 py-2.5">
-                        <span className="font-mono text-xs text-muted-foreground">
-                          {t.device_id ?? "—"}
-                        </span>
-                      </td>
+                        <td className="px-3 py-3 font-mono text-xs">
+                          {test.device_id ??
+                            "—"}
+                        </td>
 
-                      <td className="w-40 px-4 py-2.5">
-                        <ConfidenceBar
-                          value={Number(t.confidence ?? 0)}
-                        />
-                      </td>
+                        <td className="px-3 py-3 min-w-[120px]">
+                          <ConfidenceBar
+                            value={
+                              Number(
+                                test.confidence,
+                              ) || 0
+                            }
+                          />
+                        </td>
 
-                      <td className="px-4 py-2.5">
-                        <StatusBadge
-                          status={t.status as any}
-                        />
-                      </td>
+                        <td className="px-3 py-3">
+                          <StatusBadge
+                            status={
+                              test.status
+                            }
+                          />
+                        </td>
 
-                      <td className="px-4 py-2.5">
-                        <RiskBadge
-                          level={t.risk_level as any}
-                        />
-                      </td>
+                        <td className="px-3 py-3">
+                          <RiskBadge
+                            level={
+                              test.risk_level ??
+                              "low"
+                            }
+                          />
+                        </td>
 
-                      <td className="px-4 py-2.5">
-                        <span className="whitespace-nowrap text-xs text-muted-foreground">
-                          {t.created_at
-                            ? formatDateTime(t.created_at)
+                        <td className="px-3 py-3 whitespace-nowrap text-xs text-muted-foreground">
+                          {test.created_at
+                            ? formatDateTime(
+                                test.created_at,
+                              )
                             : "—"}
-                        </span>
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                      </tr>
+                    );
+                  },
                 )}
               </tbody>
             </table>
           </div>
         </Panel>
 
-        {/* PROTOTYPE NOTICE */}
-        <div className="rounded-md border border-border/60 bg-muted/20 p-4 text-xs text-muted-foreground">
-          <p className="font-medium text-foreground">
-            Prototype screening notice
+        {/* ---------------------------------------------------
+            NOTICE
+        --------------------------------------------------- */}
+        <Panel>
+          <p className="text-xs leading-5 text-muted-foreground">
+            <strong className="text-foreground">
+              Prototype screening
+              notice:
+            </strong>{" "}
+            CSV records are used as
+            reference/demo data for
+            the SentinelGrid pipeline.
+            Detector values and
+            classification logic are
+            for demonstration.
+            Any real-world
+            identification requires
+            validated instrumentation
+            and laboratory
+            confirmation.
           </p>
-          <p className="mt-1">
-            Detector values and classification logic are for demonstration
-            of the SentinelGrid pipeline. Any real-world identification
-            requires validated instrumentation and laboratory confirmation.
-          </p>
-        </div>
+        </Panel>
       </div>
     </AppShell>
   );
